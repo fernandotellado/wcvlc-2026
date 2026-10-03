@@ -1,0 +1,68 @@
+REGLA DE CACHÉ PARA CACHEAR EL HTML DE WORDPRESS EN CLOUDFLARE (PLAN GRATUITO)
+Diapositivas 16 y 17 · Los pinchos, ya montados / Cada uno con su pedido
+Charla «Optimización web (avanzada) para pobres» · WordCamp Valencia 2026
+
+Dónde: Cloudflare › tu dominio › Almacenamiento en caché › Cache Rules › Crear regla
+(Cloudflare cambia los menús a menudo; si no lo encuentras, busca «Cache Rules»).
+
+No uses la plantilla «Almacenar todo en la memoria caché»: cachea todas las
+solicitudes, también las de usuarios conectados y el carrito. Aquí va una regla
+personalizada que deja fuera lo que no se debe cachear.
+
+1) Nombre de la regla (obligatorio)
+   WordPress · HTML para visitantes anónimos
+
+2) Si las solicitudes entrantes coinciden...
+   Marca «Expresión de filtro personalizada», pulsa «Editar expresión» y pega
+   esto (cambia tudominio.com por el tuyo):
+
+(http.host eq "tudominio.com"
+ and not starts_with(http.request.uri.path, "/wp-admin")
+ and not starts_with(http.request.uri.path, "/wp-json")
+ and not http.request.uri.path in {"/wp-login.php" "/xmlrpc.php" "/wp-cron.php"}
+ and http.request.uri.query eq ""
+ and not http.cookie contains "wordpress_logged_in_"
+ and not http.cookie contains "wp-postpass_"
+ and not http.cookie contains "comment_author_"
+ and not http.cookie contains "woocommerce_items_in_cart"
+ and not http.cookie contains "wp_woocommerce_session_"
+ and not http.request.uri.path contains "/carrito"
+ and not http.request.uri.path contains "/finalizar-compra"
+ and not http.request.uri.path contains "/mi-cuenta"
+ and not http.request.uri.path contains "/cart"
+ and not http.request.uri.path contains "/checkout"
+ and not http.request.uri.path contains "/my-account")
+
+   Qué deja fuera, en cristiano:
+   - El escritorio, el acceso, la API REST, XML-RPC y el propio cron.
+   - Cualquier URL con parámetros (?s=búsqueda, ?preview=true, ?utm_...).
+   - A quien tenga sesión iniciada, entradas con contraseña o haya comentado.
+   - Carrito, caja y cuenta de WooCommerce (en español y en inglés).
+     Si has cambiado esas URL en tu tienda, cambia aquí las rutas.
+
+3) Entonces...
+   - Elegibilidad de caché: «Elegible para caché».
+   - Edge TTL: «Agregar ajuste» y elige ignorar el encabezado cache-control
+     del origen y usar un TTL propio de 2 horas.
+   - Navegador TTL: no añadas nada (así respeta lo que mande tu servidor).
+   - El resto de ajustes opcionales, sin tocar.
+
+4) «Implementar».
+
+ANTES DE DARLO POR BUENO
+- Abre la web en una ventana privada y mira la cabecera «cf-cache-status»
+  en la pestaña Red del navegador: en la segunda visita debe decir HIT.
+- Inicia sesión y comprueba que ves la barra de administración. En una tienda,
+  añade algo al carrito con un navegador y mira el carrito con otro: cada uno
+  tiene que ver el suyo.
+
+AL PUBLICAR O CAMBIAR CONTENIDO
+Cloudflare no se entera solo de que has publicado. Tienes tres opciones:
+- Dejar el TTL corto (las 2 horas de arriba) y asumir ese retraso.
+- Purgar a mano: Almacenamiento en caché › Configuración › Purgar caché.
+- Instalar el plugin oficial de Cloudflare para WordPress y activar su gestión
+  automática de caché, que purga las URL al editar o publicar
+  (https://wordpress.org/plugins/cloudflare/). Comprueba que te funciona con tu plan.
+
+Y la norma de la casa: si cacheas el HTML aquí, no hace falta otra caché de
+página encima. Una sola vez.
